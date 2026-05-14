@@ -2,42 +2,115 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Фармакология — тренажёр</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0f1419">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Фарм-тренажёр</title>
+<link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <div id="app">
+
+  <!-- ===== Верхняя панель ===== -->
   <header class="topbar">
-    <div class="brand">💊 Фарм-тренажёр</div>
-    <nav class="modes">
-      <button data-mode="learn" class="active">Учить</button>
-      <button data-mode="test">Тест</button>
-      <button data-mode="mistakes">Ошибки <span id="mistakesCount" class="badge">0</span></button>
-      <button data-mode="bookmarks">Закладки <span id="bookmarksCount" class="badge">0</span></button>
-    </nav>
-    <div class="stats">
-      <span id="progressText">— / —</span>
-      <button id="resetBtn" title="Сбросить прогресс">↻</button>
+    <div class="topbar-row">
+      <button class="icon-btn" id="menuBtn" aria-label="Меню">☰</button>
+      <div class="brand">💊 Фарм-тренажёр</div>
+      <span class="progress-pill" id="progressText">— / —</span>
+      <button class="icon-btn" id="themeBtn" aria-label="Тема">🌙</button>
     </div>
+    <div class="progress-bar"><div id="progressFill"></div></div>
   </header>
 
-  <div class="toolbar">
-    <input id="search" type="search" placeholder="Поиск по тексту вопроса…">
-    <label class="check"><input type="checkbox" id="shuffleQ"> вопросы перемешать</label>
-    <label class="check"><input type="checkbox" id="shuffleA" checked> ответы перемешать</label>
-    <button id="prevBtn">← Назад</button>
-    <button id="nextBtn">Далее →</button>
-    <input id="jump" type="number" min="1" placeholder="№" style="width:80px">
-  </div>
+  <!-- ===== Боковая панель (меню) ===== -->
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-head">
+      <div class="brand">Меню</div>
+      <button class="icon-btn" id="closeMenuBtn">✕</button>
+    </div>
 
+    <div class="sidebar-section">
+      <div class="section-title">Поиск</div>
+      <div class="search-row">
+        <input id="search" type="search" placeholder="🔍 По тексту вопроса…" inputmode="search">
+        <input id="jump" type="number" min="1" max="1990" placeholder="№" inputmode="numeric">
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-title">Режим</div>
+      <button class="mode-btn active" data-mode="learn">
+        <span class="mode-emoji">📖</span>
+        <div><div>Учить</div><div class="muted small">мгновенная подсветка</div></div>
+      </button>
+      <button class="mode-btn" data-mode="test">
+        <span class="mode-emoji">📝</span>
+        <div><div>Тест</div><div class="muted small">ответ → проверить</div></div>
+      </button>
+      <button class="mode-btn" data-mode="mistakes">
+        <span class="mode-emoji">❌</span>
+        <div><div>Ошибки <span id="mistakesCount" class="pill">0</span></div><div class="muted small">только заваленные</div></div>
+      </button>
+      <button class="mode-btn" data-mode="hard">
+        <span class="mode-emoji">🔥</span>
+        <div><div>Сложные <span id="hardCount" class="pill">0</span></div><div class="muted small">часто ошибаешься</div></div>
+      </button>
+      <button class="mode-btn" data-mode="bookmarks">
+        <span class="mode-emoji">⭐</span>
+        <div><div>Закладки <span id="bookmarksCount" class="pill">0</span></div><div class="muted small">отмеченные вопросы</div></div>
+      </button>
+      <button class="mode-btn" data-mode="exam">
+        <span class="mode-emoji">🎯</span>
+        <div><div>Экзамен</div><div class="muted small">20 случайных, со счётом</div></div>
+      </button>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-title">Настройки</div>
+      <label class="setting"><input type="checkbox" id="shuffleQ"> <span>Перемешивать вопросы</span></label>
+      <label class="setting"><input type="checkbox" id="shuffleA" checked> <span>Перемешивать варианты</span></label>
+      <label class="setting"><input type="checkbox" id="autoAdvance"> <span>Авто-переход после ответа</span></label>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-title">Прогресс</div>
+      <button class="ghost-btn" id="exportBtn">⬇️ Экспорт прогресса</button>
+      <button class="ghost-btn" id="importBtn">⬆️ Импорт прогресса</button>
+      <input type="file" id="importFile" accept="application/json" style="display:none">
+      <button class="ghost-btn danger" id="resetBtn">🗑️ Сбросить прогресс</button>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="muted small">
+        💡 <kbd>1-4</kbd> ответ · <kbd>←</kbd>/<kbd>→</kbd> навигация · <kbd>Enter</kbd> далее · <kbd>B</kbd> закладка
+      </div>
+    </div>
+  </aside>
+  <div id="overlay" class="overlay"></div>
+
+  <!-- ===== Карточка вопроса ===== -->
   <main id="card" class="card">
-    <div class="loading">Загрузка вопросов…</div>
+    <div class="loading">Загрузка…</div>
   </main>
 
-  <footer class="hint">
-    Горячие клавиши: <kbd>1-4</kbd> ответ · <kbd>←</kbd>/<kbd>→</kbd> навигация · <kbd>Enter</kbd> проверить · <kbd>B</kbd> закладка
-  </footer>
+  <!-- ===== Экзамен: итоговый экран ===== -->
+  <div id="examResult" class="exam-result" hidden>
+    <div class="exam-score">
+      <div class="exam-score-num"><span id="examCorrect">0</span> / <span id="examTotal">0</span></div>
+      <div class="exam-score-percent" id="examPercent">0%</div>
+      <div class="exam-verdict" id="examVerdict">—</div>
+    </div>
+    <button id="examRestart" class="primary big">Пройти ещё раз</button>
+    <button id="examExit" class="ghost-btn">К списку режимов</button>
+  </div>
+
+  <!-- ===== Нижняя навигация (на мобиле прибита к низу) ===== -->
+  <nav class="bottom-nav">
+    <button class="nav-btn primary big" id="actionBtn">Далее</button>
+  </nav>
+
 </div>
 
 <script src="app.js"></script>
