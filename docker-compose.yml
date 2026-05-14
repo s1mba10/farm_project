@@ -1,0 +1,7 @@
+services:
+  farm-site:
+    build: .
+    container_name: farm-site
+    ports:
+      - "8080:80"
+    restart: unless-stopped

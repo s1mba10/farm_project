@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Фармакология — тренажёр</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand">💊 Фарм-тренажёр</div>
+    <nav class="modes">
+      <button data-mode="learn" class="active">Учить</button>
+      <button data-mode="test">Тест</button>
+      <button data-mode="mistakes">Ошибки <span id="mistakesCount" class="badge">0</span></button>
+      <button data-mode="bookmarks">Закладки <span id="bookmarksCount" class="badge">0</span></button>
+    </nav>
+    <div class="stats">
+      <span id="progressText">— / —</span>
+      <button id="resetBtn" title="Сбросить прогресс">↻</button>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <input id="search" type="search" placeholder="Поиск по тексту вопроса…">
+    <label class="check"><input type="checkbox" id="shuffleQ"> вопросы перемешать</label>
+    <label class="check"><input type="checkbox" id="shuffleA" checked> ответы перемешать</label>
+    <button id="prevBtn">← Назад</button>
+    <button id="nextBtn">Далее →</button>
+    <input id="jump" type="number" min="1" placeholder="№" style="width:80px">
+  </div>
+
+  <main id="card" class="card">
+    <div class="loading">Загрузка вопросов…</div>
+  </main>
+
+  <footer class="hint">
+    Горячие клавиши: <kbd>1-4</kbd> ответ · <kbd>←</kbd>/<kbd>→</kbd> навигация · <kbd>Enter</kbd> проверить · <kbd>B</kbd> закладка
+  </footer>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
