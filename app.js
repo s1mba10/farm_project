@@ -356,11 +356,12 @@ function prev() {
 }
 
 // === Экзамен ===
+const EXAM_SIZE = 30;
 function startExam() {
-  // Берём 20 случайных вопросов, по возможности с упором на не освоенные
+  // Берём EXAM_SIZE случайных вопросов, по возможности с упором на не освоенные
   const notMastered = ALL.filter(q => !isMastered(q.id));
-  const pool = notMastered.length >= 20 ? notMastered : ALL;
-  const questions = shuffle(pool).slice(0, 20);
+  const pool = notMastered.length >= EXAM_SIZE ? notMastered : ALL;
+  const questions = shuffle(pool).slice(0, EXAM_SIZE);
   examState = { questions, current: 0, correctCount: 0, answered: false };
   renderExam();
 }

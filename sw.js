@@ -1,5 +1,5 @@
 // Простой SW: кешируем всё, что нужно для офлайна
-const CACHE = "farm-v3";
+const CACHE = "farm-v5";
 const ASSETS = [
   "./",
   "./index.html",
