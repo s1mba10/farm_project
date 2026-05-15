@@ -1,7 +1,25 @@
 services:
+  api:
+    build: ./api
+    container_name: farm-api
+    environment:
+      - DEV_MODE=${DEV_MODE:-false}
+      - DB_PATH=/data/farm.db
+      - QUESTIONS_PATH=/questions.json
+      - BOT_TOKEN=${BOT_TOKEN:-}
+      - TG_BOT_USERNAME=${TG_BOT_USERNAME:-}
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-}
+      - COOKIE_SECURE=${COOKIE_SECURE:-false}
+    volumes:
+      - ./data-db:/data
+      - ./data/questions.json:/questions.json:ro
+    restart: unless-stopped
+
   farm-site:
     build: .
     container_name: farm-site
     ports:
       - "8080:80"
+    depends_on:
+      - api
     restart: unless-stopped

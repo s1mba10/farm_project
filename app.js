@@ -499,26 +499,29 @@ function applyTheme(t) {
   if (meta) meta.setAttribute("content", t === "light" ? "#f6f8fa" : "#0f1419");
 }
 
-// === Загрузка ===
-fetch("data/questions.json")
-  .then(r => r.json())
-  .then(data => {
-    ALL = data;
+// === Загрузка вопросов (после успешной авторизации) ===
+let questionsLoaded = false;
+function loadQuestions() {
+  if (questionsLoaded) return Promise.resolve();
+  return fetch("data/questions.json")
+    .then(r => r.json())
+    .then(data => {
+      ALL = data;
+      questionsLoaded = true;
 
-    // применим сохранённые prefs к UI
-    document.getElementById("shuffleQ").checked = !!prefs.shuffleQ;
-    document.getElementById("shuffleA").checked = prefs.shuffleA !== false;
-    document.getElementById("autoAdvance").checked = !!prefs.autoAdvance;
+      document.getElementById("shuffleQ").checked = !!prefs.shuffleQ;
+      document.getElementById("shuffleA").checked = prefs.shuffleA !== false;
+      document.getElementById("autoAdvance").checked = !!prefs.autoAdvance;
 
-    // тема: сохранённая или системная
-    const sysDark = matchMedia("(prefers-color-scheme: dark)").matches;
-    applyTheme(prefs.theme || (sysDark ? "dark" : "light"));
+      const sysDark = matchMedia("(prefers-color-scheme: dark)").matches;
+      applyTheme(prefs.theme || (sysDark ? "dark" : "light"));
 
-    rebuildView();
-  })
-  .catch(e => {
-    document.getElementById("card").innerHTML = `<div class="empty"><div class='big-emoji'>⚠️</div>Ошибка загрузки: ${e}</div>`;
-  });
+      rebuildView();
+    })
+    .catch(e => {
+      document.getElementById("card").innerHTML = `<div class="empty"><div class='big-emoji'>⚠️</div>Ошибка загрузки: ${e}</div>`;
+    });
+}
 
 // === Привязка UI ===
 
@@ -706,6 +709,291 @@ function debounce(fn, ms) {
   let t;
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
 }
+
+// ============================================================
+// === Авторизация ============================================
+// ============================================================
+
+let appConfig = { dev_mode: false, tg_bot_username: "", subscription_days: 7 };
+let currentUser = null;          // { name, paid_until, paid }
+let heartbeatTimer = null;
+let lastPendingPaymentName = null;
+
+function $login(id) { return document.getElementById(id); }
+
+function showLogin(view = "auto", msg = "") {
+  const overlay = $login("loginOverlay");
+  overlay.hidden = false;
+  document.body.style.overflow = "hidden";
+
+  // переключение секций
+  const showTg = view === "tg" || (view === "auto" && !!appConfig.tg_bot_username);
+  const showDev = view === "dev" || (view === "auto" && appConfig.dev_mode);
+  const showPay = view === "pay";
+
+  $login("loginTelegram").hidden = !showTg || showPay;
+  $login("loginDev").hidden = !showDev || showPay;
+  $login("loginPayPrompt").hidden = !showPay;
+
+  if (showTg && !$login("tgWidgetMount").dataset.mounted && appConfig.tg_bot_username) {
+    mountTelegramWidget(appConfig.tg_bot_username);
+  }
+  if (appConfig.tg_bot_username) {
+    const link = "https://t.me/" + appConfig.tg_bot_username;
+    $login("botMention").textContent = "@" + appConfig.tg_bot_username;
+    $login("botMention").href = link;
+    $login("payBotLink").href = link;
+  } else {
+    $login("botMention").textContent = "(бот ещё не настроен)";
+    $login("payBotLink").textContent = "Свяжись с админом";
+  }
+  $login("payMockBtn").hidden = !appConfig.dev_mode;
+  if (showPay && lastPendingPaymentName) {
+    $login("loginPayName").textContent = "Аккаунт: " + lastPendingPaymentName;
+  }
+
+  if (msg) showLoginError(msg); else clearLoginError();
+}
+
+function hideLogin() {
+  $login("loginOverlay").hidden = true;
+  document.body.style.overflow = "";
+  clearLoginError();
+}
+
+function showLoginError(msg) {
+  const el = $login("loginError");
+  el.textContent = msg;
+  el.hidden = false;
+}
+function clearLoginError() {
+  $login("loginError").hidden = true;
+  $login("loginError").textContent = "";
+}
+
+function mountTelegramWidget(botUsername) {
+  const mount = $login("tgWidgetMount");
+  mount.innerHTML = "";
+  const script = document.createElement("script");
+  script.async = true;
+  script.src = "https://telegram.org/js/telegram-widget.js?22";
+  script.setAttribute("data-telegram-login", botUsername);
+  script.setAttribute("data-size", "large");
+  script.setAttribute("data-radius", "10");
+  script.setAttribute("data-onauth", "onTelegramAuth(user)");
+  script.setAttribute("data-request-access", "write");
+  mount.appendChild(script);
+  mount.dataset.mounted = "1";
+}
+
+// Глобальный callback от виджета Telegram
+window.onTelegramAuth = async function(user) {
+  clearLoginError();
+  try {
+    const r = await fetch("/api/auth/telegram", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(user),
+    });
+    if (r.ok) {
+      currentUser = await r.json();
+      await afterLogin();
+      return;
+    }
+    const data = await r.json().catch(() => ({}));
+    if (r.status === 402) {
+      lastPendingPaymentName = data.detail?.name || user.first_name || "";
+      showLogin("pay");
+      return;
+    }
+    showLoginError(authErrorMessage(data) || ("Ошибка входа: " + r.status));
+  } catch (e) {
+    showLoginError("Сеть недоступна. Попробуй ещё раз.");
+  }
+};
+
+async function devLogin() {
+  clearLoginError();
+  const name = $login("devName").value.trim();
+  if (!name) { showLoginError("Введи имя"); return; }
+  try {
+    const r = await fetch("/api/auth/dev-login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ name }),
+    });
+    if (r.ok) {
+      currentUser = await r.json();
+      if (!currentUser.paid) {
+        lastPendingPaymentName = currentUser.name;
+        showLogin("pay");
+        return;
+      }
+      await afterLogin();
+      return;
+    }
+    const data = await r.json().catch(() => ({}));
+    showLoginError(authErrorMessage(data) || ("Ошибка: " + r.status));
+  } catch (e) {
+    showLoginError("Сеть недоступна.");
+  }
+}
+
+async function mockPay() {
+  clearLoginError();
+  try {
+    const r = await fetch("/api/mock-pay", { method: "POST", credentials: "include" });
+    if (!r.ok) {
+      const data = await r.json().catch(() => ({}));
+      showLoginError(authErrorMessage(data) || "Не удалось эмулировать оплату");
+      return;
+    }
+    await recheckAuth();
+  } catch (e) {
+    showLoginError("Сеть недоступна.");
+  }
+}
+
+async function recheckAuth() {
+  clearLoginError();
+  const me = await fetchMe();
+  if (me && me.paid) {
+    currentUser = me;
+    await afterLogin();
+  } else if (me && !me.paid) {
+    currentUser = me;
+    lastPendingPaymentName = me.name;
+    showLogin("pay");
+  } else {
+    showLogin("auto", "Не удалось получить сессию. Войди заново.");
+  }
+}
+
+async function fetchMe() {
+  try {
+    const r = await fetch("/api/auth/me", { credentials: "include" });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch { return null; }
+}
+
+async function afterLogin() {
+  hideLogin();
+  updateAcctInfo();
+  await loadQuestions();
+  applyWatermark();
+  startHeartbeat();
+}
+
+function updateAcctInfo() {
+  if (!currentUser) return;
+  $login("acctName").textContent = currentUser.name;
+  if (currentUser.paid_until) {
+    const left = currentUser.paid_until - Math.floor(Date.now() / 1000);
+    const days = Math.max(0, Math.ceil(left / 86400));
+    $login("acctExpiry").textContent = "Подписка: " + days + " дн.";
+  } else {
+    $login("acctExpiry").textContent = "";
+  }
+}
+
+function applyWatermark() {
+  if (!currentUser) return;
+  document.querySelectorAll(".user-watermark").forEach(el => el.remove());
+  const card = document.getElementById("card");
+  if (!card) return;
+  const wm = document.createElement("div");
+  wm.className = "user-watermark";
+  wm.textContent = currentUser.name;
+  card.appendChild(wm);
+}
+
+// rerender hooks: чтобы watermark не пропадал после перерисовки карточки
+const _origRender = render;
+render = function() { _origRender.apply(this, arguments); applyWatermark(); };
+const _origRenderExam = renderExam;
+renderExam = function() { _origRenderExam.apply(this, arguments); applyWatermark(); };
+
+function authErrorMessage(data) {
+  const code = data?.detail?.error || data?.error || data?.detail;
+  switch (code) {
+    case "kicked":         return "Вы вошли с другого устройства. Этот сеанс завершён.";
+    case "expired_session":return "Сессия истекла. Войдите снова.";
+    case "no_session":     return "";
+    case "payment_required": return "Подписка не оплачена. Напиши боту, чтобы получить доступ.";
+    case "bad_signature":  return "Неверная подпись Telegram. Попробуй ещё раз.";
+    case "telegram_not_configured": return "Telegram-вход не настроен.";
+    case "bad_name":       return "Имя пустое или слишком длинное.";
+    default:               return "";
+  }
+}
+
+function startHeartbeat() {
+  stopHeartbeat();
+  heartbeatTimer = setInterval(async () => {
+    const me = await fetchMe();
+    if (!me) {
+      stopHeartbeat();
+      currentUser = null;
+      showLogin("auto", "Сессия завершена. Возможно, ты вошёл на другом устройстве.");
+      return;
+    }
+    currentUser = me;
+    updateAcctInfo();
+    if (!me.paid) {
+      stopHeartbeat();
+      lastPendingPaymentName = me.name;
+      showLogin("pay", "Подписка истекла.");
+    }
+  }, 15000);
+}
+function stopHeartbeat() {
+  if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+}
+
+async function doLogout() {
+  stopHeartbeat();
+  try { await fetch("/api/auth/logout", { method: "POST", credentials: "include" }); } catch {}
+  currentUser = null;
+  closeSidebar();
+  showLogin("auto");
+}
+
+async function boot() {
+  // тема применяется сразу, чтобы оверлей не моргал
+  const sysDark = matchMedia("(prefers-color-scheme: dark)").matches;
+  applyTheme(prefs.theme || (sysDark ? "dark" : "light"));
+
+  try {
+    const r = await fetch("/api/config");
+    if (r.ok) appConfig = await r.json();
+  } catch {}
+
+  const me = await fetchMe();
+  if (me && me.paid) {
+    currentUser = me;
+    await afterLogin();
+  } else if (me && !me.paid) {
+    currentUser = me;
+    lastPendingPaymentName = me.name;
+    showLogin("pay");
+  } else {
+    showLogin("auto");
+  }
+}
+
+// === Привязка login UI ===
+document.getElementById("devLoginBtn").addEventListener("click", devLogin);
+document.getElementById("devName").addEventListener("keydown", e => {
+  if (e.key === "Enter") devLogin();
+});
+document.getElementById("payMockBtn").addEventListener("click", mockPay);
+document.getElementById("payRecheckBtn").addEventListener("click", recheckAuth);
+document.getElementById("logoutBtn").addEventListener("click", doLogout);
+
+boot();
 
 // === Service Worker (PWA) ===
 if ("serviceWorker" in navigator) {

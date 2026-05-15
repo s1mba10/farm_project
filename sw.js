@@ -1,12 +1,11 @@
-// Простой SW: кешируем всё, что нужно для офлайна
-const CACHE = "farm-v5";
+// Простой SW: кешируем app shell, /api/* всегда из сети.
+const CACHE = "farm-v7";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
   "./manifest.json",
-  "./data/questions.json",
   "./icon-192.png",
   "./icon-512.png",
 ];
@@ -25,6 +24,8 @@ self.addEventListener("activate", e => {
 
 self.addEventListener("fetch", e => {
   if (e.request.method !== "GET") return;
+  const url = new URL(e.request.url);
+  if (url.pathname.startsWith("/api/")) return; // auth-чувствительные запросы — всегда сеть
   e.respondWith(
     caches.match(e.request).then(cached => {
       const network = fetch(e.request).then(resp => {

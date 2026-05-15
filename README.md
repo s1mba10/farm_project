@@ -20,12 +20,21 @@
 ## Запуск через Docker
 
 ```bash
+cp .env.example .env   # один раз; для локалки достаточно DEV_MODE=true
 docker compose up -d --build
 ```
 
-Открой `http://localhost:8080` — на телефоне используй IP компьютера в локальной сети.
+Открой `http://localhost:8080`. По дефолту покажет экран входа — нажми «Войти» в dev-режиме (имя любое). После этого появится экран «Нужна оплата» → кнопка **🧪 Mock-pay** добавит 7 дней подписки. После этого пускает в тренажёр.
 
-Остановить: `docker compose down`
+Остановить: `docker compose down`. SQLite-база подписок и сессий лежит в `./data-db/` (в git не попадает).
+
+### Прод
+
+В проде в `.env`:
+- `DEV_MODE=false` (отключает `dev-login` и `mock-pay`)
+- `BOT_TOKEN=...` и `TG_BOT_USERNAME=...` — токен от @BotFather и username бота для Telegram Login Widget; домен виджета зарегистрируй в боте через `/setdomain farm-test.ru`
+- `ADMIN_TOKEN=...` — длинная случайная строка; используется в заголовке `X-Admin-Token` для `POST /api/admin/grant {tg_id, days, name}` — этим эндпоинтом ты вручную выдаёшь подписку после получения денег от студента
+- `COOKIE_SECURE=true` — раз сайт за HTTPS
 
 ## Установка на телефон как приложение (PWA)
 

@@ -22,6 +22,42 @@
 <!-- /Yandex.Metrika counter -->
 </head>
 <body>
+<!-- ===== Экран входа (вне #app, чтобы не уезжал при ре-рендерах) ===== -->
+<div id="loginOverlay" class="login-overlay" hidden>
+  <div class="login-card">
+    <div class="login-emoji">💊</div>
+    <h1 class="login-title">Фарм-тренажёр</h1>
+    <p class="login-sub">Доступ — 7 дней, один активный сеанс на аккаунт.</p>
+
+    <div id="loginTelegram" class="login-section" hidden>
+      <div class="login-section-title">Вход через Telegram</div>
+      <div id="tgWidgetMount" class="tg-widget-mount"></div>
+      <p class="login-hint">
+        Не оплачено? Напиши боту <a id="botMention" href="#" target="_blank" rel="noopener">@bot</a>,
+        и я выдам доступ.
+      </p>
+    </div>
+
+    <div id="loginDev" class="login-section" hidden>
+      <div class="login-section-title">Dev-вход (без Telegram)</div>
+      <input id="devName" class="login-input" type="text" maxlength="64" placeholder="Имя">
+      <button id="devLoginBtn" class="primary big block">Войти</button>
+      <p class="login-hint">DEV_MODE=true в .env. В проде кнопка не появится.</p>
+    </div>
+
+    <div id="loginPayPrompt" class="login-section login-pay" hidden>
+      <div class="login-section-title">Нужна оплата</div>
+      <p id="loginPayName" class="muted small"></p>
+      <p>Подписка ещё не оплачена или истекла. Напиши боту, чтобы получить доступ.</p>
+      <a id="payBotLink" class="primary big block" href="#" target="_blank" rel="noopener">Открыть бота</a>
+      <button id="payMockBtn" class="ghost-btn block" hidden>🧪 Mock-pay (+7 дней)</button>
+      <button id="payRecheckBtn" class="ghost-btn block">Я оплатил — проверить</button>
+    </div>
+
+    <div id="loginError" class="login-error" hidden></div>
+  </div>
+</div>
+
 <div id="app">
 
   <!-- ===== Верхняя панель ===== -->
@@ -97,6 +133,15 @@
       <div class="muted small">
         💡 <kbd>1-4</kbd> ответ · <kbd>←</kbd>/<kbd>→</kbd> навигация · <kbd>Enter</kbd> далее · <kbd>B</kbd> закладка
       </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-title">Аккаунт</div>
+      <div id="acctInfo" class="acct-info">
+        <div class="acct-name" id="acctName">—</div>
+        <div class="muted small" id="acctExpiry"></div>
+      </div>
+      <button class="ghost-btn danger" id="logoutBtn">↩︎ Выйти</button>
     </div>
   </aside>
   <div id="overlay" class="overlay"></div>
