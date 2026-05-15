@@ -3,7 +3,7 @@ FROM nginx:alpine
 RUN rm -rf /usr/share/nginx/html/*
 
 # Копируем все статические файлы
-COPY index.html styles.css app.js manifest.json sw.js icon-192.png icon-512.png /usr/share/nginx/html/
+COPY index.html styles.css app.js manifest.json sw.js icon-192.png icon-512.png robots.txt sitemap.xml /usr/share/nginx/html/
 COPY data/ /usr/share/nginx/html/data/
 
 # Конфиг nginx с gzip и правильными content-type'ами для манифеста и SW
