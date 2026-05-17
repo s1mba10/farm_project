@@ -74,6 +74,16 @@
     </div>
 
     <div class="sidebar-section">
+      <div class="section-title">Диапазон №</div>
+      <div class="search-row">
+        <input id="rangeFrom" type="number" min="1" max="1990" placeholder="от" inputmode="numeric">
+        <input id="rangeTo" type="number" min="1" max="1990" placeholder="до" inputmode="numeric">
+        <button class="ghost-btn" id="rangeClear" title="Сбросить диапазон" aria-label="Сбросить диапазон">✕</button>
+      </div>
+      <div class="muted small">Например, 113–680. Применяется ко всем режимам. Пусто = все вопросы.</div>
+    </div>
+
+    <div class="sidebar-section">
       <div class="section-title">Режим</div>
       <button class="mode-btn active" data-mode="learn">
         <span class="mode-emoji">📖</span>
@@ -94,6 +104,10 @@
       <button class="mode-btn" data-mode="bookmarks">
         <span class="mode-emoji">⭐</span>
         <div><div>Закладки <span id="bookmarksCount" class="pill">0</span></div><div class="muted small">отмеченные вопросы</div></div>
+      </button>
+      <button class="mode-btn" data-mode="passed">
+        <span class="mode-emoji">🔁</span>
+        <div><div>Пройденные <span id="passedCount" class="pill">0</span></div><div class="muted small">всё, на что отвечал — повтор</div></div>
       </button>
       <button class="mode-btn" data-mode="exam">
         <span class="mode-emoji">🎯</span>

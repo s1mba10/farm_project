@@ -70,6 +70,17 @@ function isHard(id) {
   const s = getStat(id);
   return s.fail >= 2;  // 2+ раз ошибался
 }
+function isPassed(id) {
+  return state.attempts.has(id);
+}
+
+// Фильтр диапазона: применяется поверх любого режима.
+function applyRange(arr) {
+  const lo = Number.isFinite(prefs.rangeFrom) ? prefs.rangeFrom : -Infinity;
+  const hi = Number.isFinite(prefs.rangeTo) ? prefs.rangeTo : Infinity;
+  if (lo === -Infinity && hi === Infinity) return arr;
+  return arr.filter(x => x.id >= lo && x.id <= hi);
+}
 
 function shuffle(arr) {
   const a = [...arr];
@@ -92,6 +103,9 @@ function rebuildView() {
   if (mode === "mistakes") pool = ALL.filter(x => isMistake(x.id));
   else if (mode === "hard") pool = ALL.filter(x => isHard(x.id));
   else if (mode === "bookmarks") pool = ALL.filter(x => state.bookmarks.has(x.id));
+  else if (mode === "passed") pool = ALL.filter(x => isPassed(x.id));
+
+  pool = applyRange(pool);
 
   if (q) {
     pool = pool.filter(x =>
@@ -361,6 +375,7 @@ function updateBadges() {
   document.getElementById("mistakesCount").textContent = ALL.filter(q => isMistake(q.id)).length;
   document.getElementById("hardCount").textContent = ALL.filter(q => isHard(q.id)).length;
   document.getElementById("bookmarksCount").textContent = state.bookmarks.size;
+  document.getElementById("passedCount").textContent = state.attempts.size;
 }
 
 function updateProgress() {
@@ -394,9 +409,12 @@ function prev() {
 // === Экзамен ===
 const EXAM_SIZE = 30;
 function startExam() {
-  // Берём EXAM_SIZE случайных вопросов, по возможности с упором на не освоенные
-  const notMastered = ALL.filter(q => !isMastered(q.id));
-  const pool = notMastered.length >= EXAM_SIZE ? notMastered : ALL;
+  // Берём EXAM_SIZE случайных вопросов, по возможности с упором на не освоенные.
+  // Если задан диапазон — экзамен только по нему.
+  const inRange = applyRange(ALL);
+  const notMastered = inRange.filter(q => !isMastered(q.id));
+  const base = notMastered.length >= EXAM_SIZE ? notMastered : inRange;
+  const pool = base.length ? base : ALL;
   const questions = shuffle(pool).slice(0, EXAM_SIZE);
   examState = { questions, current: 0, correctCount: 0, answered: false };
   renderExam();
@@ -545,6 +563,8 @@ fetch("data/questions.json")
     document.getElementById("shuffleQ").checked = !!prefs.shuffleQ;
     document.getElementById("shuffleA").checked = prefs.shuffleA !== false;
     document.getElementById("autoAdvance").checked = !!prefs.autoAdvance;
+    document.getElementById("rangeFrom").value = Number.isFinite(prefs.rangeFrom) ? prefs.rangeFrom : "";
+    document.getElementById("rangeTo").value   = Number.isFinite(prefs.rangeTo)   ? prefs.rangeTo   : "";
 
     // тема: сохранённая или системная
     const sysDark = matchMedia("(prefers-color-scheme: dark)").matches;
@@ -585,6 +605,35 @@ document.querySelectorAll(".mode-btn").forEach(b => {
       rebuildView();
     }
   });
+});
+
+// Range filter
+function onRangeChange() {
+  const fEl = document.getElementById("rangeFrom");
+  const tEl = document.getElementById("rangeTo");
+  let f = parseInt(fEl.value, 10);
+  let t = parseInt(tEl.value, 10);
+  if (Number.isFinite(f) && Number.isFinite(t) && f > t) {
+    // swap, чтобы поле «от» не было больше «до»
+    [f, t] = [t, f];
+    fEl.value = f; tEl.value = t;
+  }
+  prefs.rangeFrom = Number.isFinite(f) ? f : null;
+  prefs.rangeTo   = Number.isFinite(t) ? t : null;
+  savePrefs();
+  idx = 0;
+  rebuildView();
+}
+document.getElementById("rangeFrom").addEventListener("change", onRangeChange);
+document.getElementById("rangeTo").addEventListener("change", onRangeChange);
+document.getElementById("rangeClear").addEventListener("click", () => {
+  document.getElementById("rangeFrom").value = "";
+  document.getElementById("rangeTo").value = "";
+  prefs.rangeFrom = null;
+  prefs.rangeTo = null;
+  savePrefs();
+  idx = 0;
+  rebuildView();
 });
 
 // Settings
