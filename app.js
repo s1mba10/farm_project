@@ -26,18 +26,22 @@ function loadState() {
     return {
       bookmarks: new Set(s.bookmarks || []),
       stats: new Map(Object.entries(s.stats || {}).map(([k,v]) => [parseInt(k,10), v])),
+      attempts: new Map(Object.entries(s.attempts || {}).map(([k,v]) => [parseInt(k,10), v])),
     };
   } catch {
-    return { bookmarks: new Set(), stats: new Map() };
+    return { bookmarks: new Set(), stats: new Map(), attempts: new Map() };
   }
 }
 
 function saveState() {
   const statsObj = {};
   state.stats.forEach((v, k) => { statsObj[k] = v; });
+  const attemptsObj = {};
+  state.attempts.forEach((v, k) => { attemptsObj[k] = v; });
   localStorage.setItem(LS_KEY, JSON.stringify({
     bookmarks: [...state.bookmarks],
     stats: statsObj,
+    attempts: attemptsObj,
   }));
 }
 
@@ -168,6 +172,35 @@ function render() {
 
   // Кнопка действия внизу
   setActionButton(q.type === "multi" ? "check" : (mode === "test" ? "check" : "skip"));
+
+  // Если на этот вопрос уже отвечали — восстанавливаем подсветку (свои + правильные)
+  const prev = state.attempts.get(q.id);
+  if (prev) replayAttempt(q, prev);
+}
+
+function replayAttempt(q, attempt) {
+  answered = true;
+  selected = new Set(attempt.selected);
+  const correctSet = new Set(q.correct);
+  document.querySelectorAll(".option").forEach(el => {
+    el.classList.add("disabled");
+    const i = parseInt(el.dataset.i, 10);
+    const isCorrect = correctSet.has(i);
+    const isSel = selected.has(i);
+    el.classList.remove("selected");
+    if (isSel && isCorrect) el.classList.add("correct");
+    else if (isSel && !isCorrect) el.classList.add("wrong");
+    else if (!isSel && isCorrect) el.classList.add("reveal-correct");
+  });
+  const fb = document.getElementById("feedback");
+  if (attempt.ok) {
+    fb.innerHTML = `<div class="feedback ok">✓ Верно!</div>`;
+  } else if (!attempt.selected.length) {
+    fb.innerHTML = `<div class="feedback fail">💡 Правильный ответ подсвечен зелёным. Эта попытка не зачитывается.</div>`;
+  } else {
+    fb.innerHTML = `<div class="feedback fail">✗ Неверно. Правильный ответ подсвечен зелёным.</div>`;
+  }
+  setActionButton(attempt.ok ? "next" : "next-fail");
 }
 
 // Управление главной кнопкой действия в нижней навигации
@@ -268,6 +301,7 @@ function checkAnswer() {
     cur.streak = 0;
   }
   state.stats.set(q.id, cur);
+  state.attempts.set(q.id, { selected: [...selected], ok });
   saveState();
   updateBadges();
   updateProgress();
@@ -297,6 +331,8 @@ function revealAnswer() {
   document.getElementById("feedback").innerHTML =
     `<div class="feedback fail">💡 Правильный ответ подсвечен зелёным. Эта попытка не зачитывается.</div>`;
   setActionButton("next-fail");
+  state.attempts.set(q.id, { selected: [], ok: false });
+  saveState();
 }
 
 function refreshTopBadges(id) {
@@ -571,7 +607,9 @@ document.getElementById("themeBtn").addEventListener("click", () => {
 document.getElementById("exportBtn").addEventListener("click", () => {
   const statsObj = {};
   state.stats.forEach((v, k) => { statsObj[k] = v; });
-  const data = { bookmarks: [...state.bookmarks], stats: statsObj, exported: new Date().toISOString() };
+  const attemptsObj = {};
+  state.attempts.forEach((v, k) => { attemptsObj[k] = v; });
+  const data = { bookmarks: [...state.bookmarks], stats: statsObj, attempts: attemptsObj, exported: new Date().toISOString() };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -596,6 +634,10 @@ document.getElementById("importFile").addEventListener("change", e => {
         state.stats.clear();
         Object.entries(d.stats).forEach(([k,v]) => state.stats.set(parseInt(k,10), v));
       }
+      if (d.attempts) {
+        state.attempts.clear();
+        Object.entries(d.attempts).forEach(([k,v]) => state.attempts.set(parseInt(k,10), v));
+      }
       saveState();
       updateBadges();
       render();
@@ -609,6 +651,7 @@ document.getElementById("resetBtn").addEventListener("click", () => {
   if (!confirm("Сбросить весь прогресс (статистику и закладки)?")) return;
   state.bookmarks.clear();
   state.stats.clear();
+  state.attempts.clear();
   saveState();
   updateBadges();
   rebuildView();
