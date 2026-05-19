@@ -9,6 +9,10 @@ let mode = "learn";
 let answered = false;
 let selected = new Set();
 let orderMap = [];
+// Вопросы, на которые ответили В ЭТОЙ СЕССИИ (сбрасывается при перезагрузке).
+// Только для них показываем replay в render() — иначе режимы «Ошибки», «Сложные»,
+// «Пройденные» сразу выдавали бы правильный ответ, не дав попробовать заново.
+const sessionAnsweredIds = new Set();
 
 // Экзамен
 let examState = null; // { questions: [...], current: 0, correctCount: 0, answered: false }
@@ -187,9 +191,11 @@ function render() {
   // Кнопка действия внизу
   setActionButton(q.type === "multi" ? "check" : (mode === "test" ? "check" : "skip"));
 
-  // Если на этот вопрос уже отвечали — восстанавливаем подсветку (свои + правильные)
+  // Replay прошлой попытки — только если в текущей сессии уже отвечали
+  // (свайпнули вперёд и вернулись). Иначе сразу подсвечивать = испортить
+  // повторное прохождение в режимах «Ошибки», «Сложные», «Пройденные».
   const prev = state.attempts.get(q.id);
-  if (prev) replayAttempt(q, prev);
+  if (prev && sessionAnsweredIds.has(q.id)) replayAttempt(q, prev);
 }
 
 function replayAttempt(q, attempt) {
@@ -316,6 +322,7 @@ function checkAnswer() {
   }
   state.stats.set(q.id, cur);
   state.attempts.set(q.id, { selected: [...selected], ok });
+  sessionAnsweredIds.add(q.id);
   saveState();
   updateBadges();
   updateProgress();
@@ -346,6 +353,7 @@ function revealAnswer() {
     `<div class="feedback fail">💡 Правильный ответ подсвечен зелёным. Эта попытка не зачитывается.</div>`;
   setActionButton("next-fail");
   state.attempts.set(q.id, { selected: [], ok: false });
+  sessionAnsweredIds.add(q.id);
   saveState();
 }
 
@@ -701,6 +709,7 @@ document.getElementById("resetBtn").addEventListener("click", () => {
   state.bookmarks.clear();
   state.stats.clear();
   state.attempts.clear();
+  sessionAnsweredIds.clear();
   saveState();
   updateBadges();
   rebuildView();
